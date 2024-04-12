@@ -6,6 +6,8 @@ from rclpy.node import Node
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
 
+from std_msgs.msg import String
+
 import math
 
 class NavigationPath(Node):
