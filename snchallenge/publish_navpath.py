@@ -12,6 +12,7 @@ import geometry_msgs.msg
 import tf2_geometry_msgs
 import tf2_ros
 
+
 class NavigationPath(Node):
     def __init__(self):
         super().__init__('aiil_navigationpath')
@@ -41,23 +42,27 @@ class NavigationPath(Node):
         
     def publish_path(self):
         # Current time 
-        time = self.get_clock().now()
+        #time = self.get_clock().now()
+        time = rclpy.time.Time()
         self.get_logger().info(str(time))
         
+        dest = 'odom'
+        src = 'base_link'
+
         # Create a new Path message
         path_msg = Path()
-        path_msg.header.frame_id = 'map'
+        path_msg.header.frame_id = src
         path_msg.header.stamp = time.to_msg()
 
         # Add one pose to the path (to-do: need to add all)
         
         pose = PoseStamped()
-        pose.header.frame_id = 'map'
+        pose.header.frame_id = src
         pose.header.stamp = time.to_msg()
         
-        pose.pose.position.x = 0
-        pose.pose.position.y = 0
-        pose.pose.position.z = 0
+        pose.pose.position.x = 0.0
+        pose.pose.position.y = 0.0
+        pose.pose.position.z = 0.0
         
         
         pose.pose.orientation.x = 1.0
@@ -66,26 +71,25 @@ class NavigationPath(Node):
         pose.pose.orientation.w = 0.0
 
         # Configure frames
-        dest = 'odom'
-        src = 'base_link'
-        self.get_logger().info(f"From frame: {src}")
-        self.get_logger().info(f"To frame: {dest}")
+        
+        #self.get_logger().info(f"From frame: {src}")
+        #self.get_logger().info(f"To frame: {dest}")
 
         # Timeout for transform data
         timeout = rclpy.duration.Duration(seconds=0.05)
 
         # Lookup a transform
-        transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
-        self.get_logger().info(f"Transform: {transform.transform}")
+        #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
+        #self.get_logger().info(f"Transform: {transform.transform}")
 
         poseT = self.tf_buffer.transform(pose, dest)
-        self.get_logger().info(f" - Pose: {pose} transformed is {poseT}")
+        self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
 
         path_msg.poses.append(poseT)
 
         # Publish the path
         self.pub.publish(path_msg)
-        self.get_logger().info('Navigation path published.')
+        #self.get_logger().info('Navigation path published.')
 
 def main():
     rclpy.init()
