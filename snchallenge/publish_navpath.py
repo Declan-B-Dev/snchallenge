@@ -41,8 +41,8 @@ class NavigationPath(Node):
 
         
     def publish_path(self):
-        # Current time 
-        time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.1)
+        # Current time CONFIGURABLE 
+        time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.3)
         #time = rclpy.time.Time()
         self.get_logger().info(str(time))
         
