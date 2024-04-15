@@ -42,11 +42,11 @@ class NavigationPath(Node):
         
     def publish_path(self):
         # Current time 
-        #time = self.get_clock().now()
-        time = rclpy.time.Time()
+        time = self.get_clock().now()
+        #time = rclpy.time.Time()
         self.get_logger().info(str(time))
         
-        dest = 'odom'
+        dest = 'map'
         src = 'base_link'
 
         # Create a new Path message

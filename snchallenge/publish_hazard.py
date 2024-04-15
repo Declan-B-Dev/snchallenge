@@ -33,7 +33,7 @@ class HazardPublisher(Node):
     def publish_path(self):
         # Current time 
         time = self.get_clock().now()
-        self.get_logger().info(str(time))
+        #self.get_logger().info(str(time))
         
         # Create the marker
         marker_msg = Marker()
@@ -63,7 +63,7 @@ class HazardPublisher(Node):
 
         # Publish
         self.pub.publish(marker_msg)
-        self.get_logger().info('Visualization marker published.')
+        #self.get_logger().info('Visualization marker published.')
         
         self.xmul = -self.xmul
 
