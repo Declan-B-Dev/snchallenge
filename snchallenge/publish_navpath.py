@@ -44,55 +44,61 @@ class NavigationPath(Node):
 
         
     def publish_path(self):
-        # Current time CONFIGURABLE 
-        time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.3)
-        #time = rclpy.time.Time()
-        self.get_logger().info(str(time))
-        
-        dest = 'map'
-        src = 'base_link'
 
-        # Create a new Path message
-        
-        self.path_msg.header.frame_id = src
-        self.path_msg.header.stamp = time.to_msg()
+        try:
+            # Current time CONFIGURABLE 
+            time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.3)
+            #time = rclpy.time.Time()
+            self.get_logger().info(str(time))
+            
+            dest = 'map'
+            src = 'base_link'
 
-        # Add one pose to the path (to-do: need to add all)
-        
-        pose = PoseStamped()
-        pose.header.frame_id = src
-        pose.header.stamp = time.to_msg()
-        
-        pose.pose.position.x = 0.0
-        pose.pose.position.y = 0.0
-        pose.pose.position.z = 0.0
-        
-        # Equivalent to 0,0,0 roll, pitch, yaw
-        pose.pose.orientation.x = 1.0
-        pose.pose.orientation.y = 0.0
-        pose.pose.orientation.z = 0.0
-        pose.pose.orientation.w = 0.0
+            # Create a new Path message
+            
+            self.path_msg.header.frame_id = src
+            self.path_msg.header.stamp = time.to_msg()
 
-        # Configure frames
-        
-        #self.get_logger().info(f"From frame: {src}")
-        #self.get_logger().info(f"To frame: {dest}")
+            # Add one pose to the path (to-do: need to add all)
+            
+            pose = PoseStamped()
+            pose.header.frame_id = src
+            pose.header.stamp = time.to_msg()
+            
+            pose.pose.position.x = 0.0
+            pose.pose.position.y = 0.0
+            pose.pose.position.z = 0.0
+            
+            # Equivalent to 0,0,0 roll, pitch, yaw
+            pose.pose.orientation.x = 1.0
+            pose.pose.orientation.y = 0.0
+            pose.pose.orientation.z = 0.0
+            pose.pose.orientation.w = 0.0
 
-        # Timeout for transform data
-        timeout = rclpy.duration.Duration(seconds=0.05)
+            # Configure frames
+            
+            #self.get_logger().info(f"From frame: {src}")
+            #self.get_logger().info(f"To frame: {dest}")
 
-        # Lookup a transform
-        #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
-        #self.get_logger().info(f"Transform: {transform.transform}")
+            # Timeout for transform data
+            timeout = rclpy.duration.Duration(seconds=0.05)
 
-        poseT = self.tf_buffer.transform(pose, dest)
-        self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
+            # Lookup a transform
+            #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
+            #self.get_logger().info(f"Transform: {transform.transform}")
 
-        self.path_msg.poses.append(poseT)
+            poseT = self.tf_buffer.transform(pose, dest)
+            self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
 
-        # Publish the path
-        self.pub.publish(self.path_msg)
-        #self.get_logger().info('Navigation path published.')
+            self.path_msg.poses.append(poseT)
+
+            # Publish the path
+            self.pub.publish(self.path_msg)
+            #self.get_logger().info('Navigation path published.')
+        except tf2_ros.ExtrapolationException:
+            self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
+        except tf2_ros.TransformException as ex:
+            self.get_logger().info(f'Could not transform {src} to {dest}: {ex}')
 
 def main():
     rclpy.init()
