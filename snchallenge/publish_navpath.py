@@ -36,6 +36,9 @@ class NavigationPath(Node):
         self.tf_buffer = tf2_ros.buffer.Buffer()
         self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self)
 
+        #initialise path message
+        self.path_msg = Path()
+
         # Iteration
         self.timer = self.create_timer(self.frequency, self.publish_path)
 
@@ -50,9 +53,9 @@ class NavigationPath(Node):
         src = 'base_link'
 
         # Create a new Path message
-        path_msg = Path()
-        path_msg.header.frame_id = src
-        path_msg.header.stamp = time.to_msg()
+        
+        self.path_msg.header.frame_id = src
+        self.path_msg.header.stamp = time.to_msg()
 
         # Add one pose to the path (to-do: need to add all)
         
@@ -64,7 +67,7 @@ class NavigationPath(Node):
         pose.pose.position.y = 0.0
         pose.pose.position.z = 0.0
         
-        
+        # Equivalent to 0,0,0 roll, pitch, yaw
         pose.pose.orientation.x = 1.0
         pose.pose.orientation.y = 0.0
         pose.pose.orientation.z = 0.0
@@ -85,10 +88,10 @@ class NavigationPath(Node):
         poseT = self.tf_buffer.transform(pose, dest)
         self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
 
-        path_msg.poses.append(poseT)
+        self.path_msg.poses.append(poseT)
 
         # Publish the path
-        self.pub.publish(path_msg)
+        self.pub.publish(self.path_msg)
         #self.get_logger().info('Navigation path published.')
 
 def main():
