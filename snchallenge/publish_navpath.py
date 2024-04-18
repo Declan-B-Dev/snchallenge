@@ -49,7 +49,7 @@ class NavigationPath(Node):
             # Current time CONFIGURABLE 
             time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.3)
             #time = rclpy.time.Time()
-            self.get_logger().info(str(time))
+            #self.get_logger().info(str(time))
             
             dest = 'map'
             src = 'base_link'
@@ -88,7 +88,7 @@ class NavigationPath(Node):
             #self.get_logger().info(f"Transform: {transform.transform}")
 
             poseT = self.tf_buffer.transform(pose, dest)
-            self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
+            #self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
 
             self.path_msg.poses.append(poseT)
 
@@ -96,8 +96,10 @@ class NavigationPath(Node):
             self.pub.publish(self.path_msg)
             #self.get_logger().info('Navigation path published.')
         except tf2_ros.ExtrapolationException as ex:
+            #pass
             self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
         except tf2_ros.TransformException as ex2:
+            #pass
             self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
 
 def main():

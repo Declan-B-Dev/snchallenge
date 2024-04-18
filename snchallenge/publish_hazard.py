@@ -2,6 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Float32MultiArray
 
 from visualization_msgs.msg import Marker
 
@@ -27,10 +28,18 @@ class HazardPublisher(Node):
         self.pub = self.create_publisher(Marker, self.topic, 10)
         
         # Iteration
-        self.timer = self.create_timer(self.frequency, self.publish_path)
+        #self.timer = self.create_timer(self.frequency, self.publish_path)
         self.xmul = 1.0
 
-    def publish_path(self):
+        # Subscriber for /Objects
+        self.sub_be = self.create_subscription(
+                            Float32MultiArray,
+                            '/objects',
+                            self.object_listener,
+                            10
+                    )
+
+    def publish_hazard(self, details):
         # Current time 
         time = self.get_clock().now()
         #self.get_logger().info(str(time))
@@ -42,6 +51,9 @@ class HazardPublisher(Node):
         marker_msg.type = Marker.SPHERE
         marker_msg.action = Marker.ADD
         
+        # Marker ID
+        marker_msg.id = details[0]
+
         marker_msg.pose.position.x = 1.0 * self.xmul
         marker_msg.pose.position.y = 2.0
         marker_msg.pose.position.z = 0.0
@@ -66,6 +78,19 @@ class HazardPublisher(Node):
         #self.get_logger().info('Visualization marker published.')
         
         self.xmul = -self.xmul
+    
+    def object_listener(self, msg):
+        #MultiArrayLayout  layout        # specification of data layout
+            #MultiArrayDimension[] dim #
+                #string label   #
+                #uint32 size    #
+                #uint32 stride  #
+            #uint32 data_offset        #
+        #float32[]         data          # array of data
+        if(msg.data):
+            self.get_logger().info(f'Object Data: {msg.data[0]}')
+            details = [int(msg.data[0])]
+            self.publish_hazard(details)
 
 def main():
     rclpy.init()
