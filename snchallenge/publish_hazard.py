@@ -7,6 +7,7 @@ from std_msgs.msg import Float32MultiArray
 from visualization_msgs.msg import Marker
 
 import math
+import cv2 as cv
 
 class HazardPublisher(Node):
     def __init__(self):
@@ -91,6 +92,60 @@ class HazardPublisher(Node):
             self.get_logger().info(f'Object Data: {msg.data[0]}')
             details = [int(msg.data[0])]
             self.publish_hazard(details)
+    
+    # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
+    def get_object_position(self, data):
+        OBJECT_TO_FOLLOW = 3
+        CAMERA_WIDTH = 640 # left 0, right 640
+
+        MIN_ANG_VEL = 0.15
+        MAX_ANG_VEL = 0.5
+        ANGULAR_GAIN = 2e-3 
+        #int obj_x_pos;
+        #float ang_vel;
+
+        # Reset linear and angular speed value
+        #vel_msg.linear.x = 0;
+        #vel_msg.angular.z = 0;
+
+        if data:
+            id = data[0]
+            objectWidth = data[1]
+            objectHeight = data[2]
+            
+            #cv::Mat cvHomography(3, 3, CV_32F) (instead just use numpy array)
+            
+            cv
+            std::vector<cv::Point2f> inPts, outPts;
+            switch (id)
+            {
+            case OBJECT_TO_FOLLOW:
+
+                // Matrix completion
+                for(int i=0; i<9; i++){
+                    cvHomography.at<float>(i%3, i/3) = object->data[i+3];
+                }
+
+                // Save corners to vector
+                inPts.push_back(cv::Point2f(0, 0));
+                inPts.push_back(cv::Point2f(objectWidth, 0));
+                inPts.push_back(cv::Point2f(0, objectHeight));
+                inPts.push_back(cv::Point2f(objectWidth, objectHeight));
+                cv::perspectiveTransform(inPts, outPts, cvHomography);
+
+                obj_x_pos = (outPts.at(0).x + outPts.at(1).x + outPts.at(2).x + outPts.at(3).x) / 4;
+                ang_vel = ANGULAR_GAIN*(CAMERA_WIDTH/2 - obj_x_pos);
+
+                // Set angular speed
+                if(ang_vel <= -MIN_ANG_VEL || ang_vel >= MIN_ANG_VEL){
+                    vel_msg.angular.z = std::max(-MAX_ANG_VEL, std::min(ang_vel, MAX_ANG_VEL));
+                }
+                ROS_INFO("id: %d\t ang_vel: %f", id, vel_msg.angular.z);
+                break;
+            }
+        }
+
+        vel_pub.publish(vel_msg);
 
 def main():
     rclpy.init()

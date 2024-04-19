@@ -47,7 +47,7 @@ class NavigationPath(Node):
 
         try:
             # Current time CONFIGURABLE 
-            time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.3)
+            time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.4)
             #time = rclpy.time.Time()
             #self.get_logger().info(str(time))
             
@@ -81,14 +81,14 @@ class NavigationPath(Node):
             #self.get_logger().info(f"To frame: {dest}")
 
             # Timeout for transform data
-            timeout = rclpy.duration.Duration(seconds=0.05)
+            timeout = rclpy.duration.Duration(seconds=0.8)
 
             # Lookup a transform
             #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
             #self.get_logger().info(f"Transform: {transform.transform}")
 
             poseT = self.tf_buffer.transform(pose, dest)
-            #self.get_logger().info(f" - transformed is {poseT.pose.orientation.x}")
+            self.get_logger().info(f" - transformed is {poseT.pose}")
 
             self.path_msg.poses.append(poseT)
 

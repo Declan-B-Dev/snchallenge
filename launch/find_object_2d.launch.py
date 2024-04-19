@@ -19,7 +19,7 @@ def generate_launch_description():
 
         # Launch arguments
         # Set to false when running after training is finished
-        DeclareLaunchArgument('gui', default_value='true', description='Launch GUI.'),
+        DeclareLaunchArgument('gui', default_value='false', description='Launch GUI.'),
         
         # Our default camera topic. If streaming images, consider using the compressed image instead
         DeclareLaunchArgument('image_topic', default_value=image_topic, description='Image topic from the camera (best_effort).'),
