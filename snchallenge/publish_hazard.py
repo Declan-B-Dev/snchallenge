@@ -7,6 +7,7 @@ from std_msgs.msg import Float32MultiArray
 from visualization_msgs.msg import Marker
 
 import math
+import numpy as np
 import cv2 as cv
 
 class HazardPublisher(Node):
@@ -90,12 +91,10 @@ class HazardPublisher(Node):
         #float32[]         data          # array of data
         if(msg.data):
             self.get_logger().info(f'Object Data: {msg.data[0]}')
-            details = [int(msg.data[0])]
-            self.publish_hazard(details)
+            self.get_object_position(msg.data)
     
     # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
     def get_object_position(self, data):
-        OBJECT_TO_FOLLOW = 3
         CAMERA_WIDTH = 640 # left 0, right 640
 
         MIN_ANG_VEL = 0.15
@@ -112,40 +111,19 @@ class HazardPublisher(Node):
             id = data[0]
             objectWidth = data[1]
             objectHeight = data[2]
+
+            inPts = np.array([[0, 0], [objectWidth, 0], [0, objectHeight], [objectWidth, objectHeight]], dtype=np.float32)
+            hMatrix = np.array([[data[3],data[4],data[5]],[data[6],data[7],data[8]],[data[9],data[10],data[11]]], dtype=np.float32).reshape((3, 3))
+            inPts = np.array([inPts])
+
+            dest = cv.perspectiveTransform(inPts, hMatrix)
+            self.get_logger().info(f'Dest: {dest}')
             
-            #cv::Mat cvHomography(3, 3, CV_32F) (instead just use numpy array)
-            
-            cv
-            std::vector<cv::Point2f> inPts, outPts;
-            switch (id)
-            {
-            case OBJECT_TO_FOLLOW:
+            obj_x_pos = (dest[0][0][0] + dest[0][1][0] + dest[0][2][0] + dest[0][3][0]) / 4
+            ang_vel = ANGULAR_GAIN*(CAMERA_WIDTH/2 - obj_x_pos)
 
-                // Matrix completion
-                for(int i=0; i<9; i++){
-                    cvHomography.at<float>(i%3, i/3) = object->data[i+3];
-                }
-
-                // Save corners to vector
-                inPts.push_back(cv::Point2f(0, 0));
-                inPts.push_back(cv::Point2f(objectWidth, 0));
-                inPts.push_back(cv::Point2f(0, objectHeight));
-                inPts.push_back(cv::Point2f(objectWidth, objectHeight));
-                cv::perspectiveTransform(inPts, outPts, cvHomography);
-
-                obj_x_pos = (outPts.at(0).x + outPts.at(1).x + outPts.at(2).x + outPts.at(3).x) / 4;
-                ang_vel = ANGULAR_GAIN*(CAMERA_WIDTH/2 - obj_x_pos);
-
-                // Set angular speed
-                if(ang_vel <= -MIN_ANG_VEL || ang_vel >= MIN_ANG_VEL){
-                    vel_msg.angular.z = std::max(-MAX_ANG_VEL, std::min(ang_vel, MAX_ANG_VEL));
-                }
-                ROS_INFO("id: %d\t ang_vel: %f", id, vel_msg.angular.z);
-                break;
-            }
-        }
-
-        vel_pub.publish(vel_msg);
+            self.get_logger().info(f'XPos: {obj_x_pos}')
+            self.get_logger().info(f'Angle: {ang_vel}')            
 
 def main():
     rclpy.init()

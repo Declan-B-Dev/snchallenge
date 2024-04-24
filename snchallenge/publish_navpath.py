@@ -96,11 +96,11 @@ class NavigationPath(Node):
             self.pub.publish(self.path_msg)
             #self.get_logger().info('Navigation path published.')
         except tf2_ros.ExtrapolationException as ex:
-            #pass
-            self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
+            pass
+            #self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
         except tf2_ros.TransformException as ex2:
-            #pass
-            self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
+            pass
+            #self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
 
 def main():
     rclpy.init()
