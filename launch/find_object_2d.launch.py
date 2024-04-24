@@ -53,7 +53,7 @@ def generate_launch_description():
         
         # Best Effort repeater since find_object ONLY uses reliable QoS
         Node(
-            package='aiil_rosbot_demo',
+            package='snchallenge',
             executable='best_effort_repeater',
             name='best_effort_repeater',
             output='screen',
