@@ -61,6 +61,8 @@ class HazardPublisher(Node):
                     )
         
         self.scan_dict = OrderedDict()
+
+        self.hazards = []
         
         # Transform listener
         self.tf_buffer = tf2_ros.buffer.Buffer()
@@ -74,7 +76,7 @@ class HazardPublisher(Node):
         self.scan_dict[keyTime] = msg.ranges
         #self.get_logger().info(f"Laser time: {timeStamp}")
         
-        #self.get_logger().info(f"Key time: {keyTime}")
+        self.get_logger().info(f"Key time: {keyTime}")
         
 
         if len(self.scan_dict) > 30:
@@ -98,11 +100,10 @@ class HazardPublisher(Node):
 
         #todo CAMERA HEIGHT
 
-        self.get_logger().info(f"Trasnform1") 
         poseT = self.transform([details[1], details[2], 0.0], 'camera_color_frame', 'map')
         
         if(poseT):
-            self.get_logger().info(f"PoseT: {poseT.pose}")
+            #self.get_logger().info(f"PoseT: {poseT.pose}")
             
             marker_msg.pose.position.x = poseT.pose.position.x
             marker_msg.pose.position.y = poseT.pose.position.y
@@ -126,24 +127,21 @@ class HazardPublisher(Node):
 
             # Publish
             self.pub.publish(marker_msg)
-        #self.get_logger().info('Visualization marker published.')
-        
-        self.xmul = -self.xmul
+            
+            # self.get_logger().info('Visualization marker published.')
 
     def object_listener(self, msg):
-        #MultiArrayLayout  layout        # specification of data layout
-            #MultiArrayDimension[] dim #
-                #string label   #
-                #uint32 size    #
-                #uint32 stride  #
-            #uint32 data_offset        #
-        #float32[]         data          # array of data
-        if(msg.data):
-            self.get_logger().info(f'Object Data: {msg.data[0]}')
-            time = self.get_clock().now()
-            #time = rclpy.time.Time()
+
+        if msg.data and msg.data[0] == 13:
+            pass
+
+        elif msg.data and msg.data[0] not in self.hazards:
+            #self.get_logger().info(f'Object Data: {msg.data[0]}')
+            time = self.get_clock().now() # CONSTRUCT time = rclpy.time.Time()
             
             self.get_object_position(msg.data, time)
+            self.hazards.append(msg.data[0])
+            self.get_logger().info(f"Hazards: {self.hazards}")
     
     # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
     def get_object_position(self, data, time):
@@ -167,22 +165,22 @@ class HazardPublisher(Node):
         self.get_logger().info(f"X Pos: {obj_x_pos}")
 
         #minX = 0
-        #maxX = 320
+        #maxX = 640
 
-        factor = 160 - obj_x_pos
+        factor = 320 - obj_x_pos
 
         #minAng = 315
         #maxAng = 45
 
-        laser = 315 + round(obj_x_pos/320*90)
+        laser = 315 + round(obj_x_pos/640*90)
 
         if(laser > 359):
             laser = laser - 360
 
-        depth = self.get_depth(time, laser) 
+        depth = min(self.get_depth(time, laser), 1.5) 
 
-        xValue = depth - abs(factor/320)
-        yValue = depth*(factor/320)
+        xValue = depth - abs(factor/640)
+        yValue = depth*(factor/640)
 
         self.get_logger().info(f"laser: {laser}")
         self.get_logger().info(f"xValue: {xValue}")
@@ -193,20 +191,31 @@ class HazardPublisher(Node):
         self.publish_hazard(details)
 
     def get_depth(self, timestamp, range):
+      
+        #1714130290.672538618
 
-        self.get_logger().info(f"Time: {timestamp}")      
-        timestamp = 0
-  
+        timestamp = round(timestamp.nanoseconds/1000000000,1)
+        self.get_logger().info(f"Time2: {timestamp}")
+    
 
         depth = 0.5
+        range = range*2 # rosbots have 720 readings not 360
 
         if timestamp in self.scan_dict:
             depth = self.scan_dict[timestamp][range]
+            self.get_logger().info(f"Using deange1: {len(self.scan_dict[timestamp])}")
             self.get_logger().info(f"Found depth: {depth}")
-        
+
+        elif timestamp - 0.1 in self.scan_dict:
+            depth = self.scan_dict[timestamp - 0.1][range]
+            self.get_logger().info(f"Using deange2: {len(self.scan_dict[timestamp - 0.1])}")
+            self.get_logger().info(f"Found depth2: {depth}")
+
         elif self.scan_dict:
-            self.get_logger().info(f"Using range: {range}")
-            depth = self.scan_dict.popitem(last=True)[range] # most recent entry
+            depth = self.scan_dict.popitem()[1] # most recent entry
+            self.get_logger().info(f"Using deange3: {len(depth)}")
+            depth = depth[range]
+            self.get_logger().info(f"Using depth3: {depth}")
 
         return depth
         
@@ -214,8 +223,7 @@ class HazardPublisher(Node):
     def transform(self, srcPose, src, dest):
         
         poseT = None
-
-
+        
         try:
             # Current time CONFIGURABLE 
             #time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.4)
@@ -262,6 +270,7 @@ class HazardPublisher(Node):
             self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
         
         return poseT
+    
 def main():
     rclpy.init()
     node = HazardPublisher()

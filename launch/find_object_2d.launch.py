@@ -5,11 +5,11 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    image_topic = '/camera/color/image_raw'
-    #image_topic = '/camera/color/image_raw/compressed'
+    #image_topic = '/camera/color/image_raw'
+    image_topic = '/camera/color/image_raw/compressed'
     image_topic_repeat = image_topic + '/repeat'
-    use_compressed = 'false'
-    #use_compressed = 'true'
+    #use_compressed = 'false'
+    use_compressed = 'true'
     
    
     return LaunchDescription([
