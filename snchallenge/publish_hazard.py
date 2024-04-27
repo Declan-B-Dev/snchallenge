@@ -13,6 +13,8 @@ from sensor_msgs.msg import LaserScan
 
 import tf2_geometry_msgs
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
+
 
 from collections import OrderedDict
 
@@ -37,12 +39,9 @@ class HazardPublisher(Node):
         self.frequency = self.get_parameter('frequency').value
         
         # Publisher
-        self.topic = "/hazards"
-        self.pub = self.create_publisher(Marker, self.topic, 10)
+        self.pub = self.create_publisher(Marker, '/hazards', 10)
         
-        # Iteration
-        #self.timer = self.create_timer(self.frequency, self.publish_path)
-        self.xmul = 1.0
+        self.start_pub = self.create_publisher(Bool, '/start', 10)
 
         # Subscriber for /Objects
         self.sub_be = self.create_subscription(
@@ -63,6 +62,8 @@ class HazardPublisher(Node):
         self.scan_dict = OrderedDict()
 
         self.hazards = []
+
+        self.started = False
         
         # Transform listener
         self.tf_buffer = tf2_ros.buffer.Buffer()
@@ -132,8 +133,12 @@ class HazardPublisher(Node):
 
     def object_listener(self, msg):
 
-        if msg.data and msg.data[0] == 13:
-            pass
+        if msg.data and msg.data[0] and not self.started == 13:
+            start_msg = Bool()
+            start_msg.data = True
+            self.start_pub.publish(start_msg)
+            self.get_logger().info(f'Sent start msg')
+            self.started = True
 
         elif msg.data and msg.data[0] not in self.hazards:
             #self.get_logger().info(f'Object Data: {msg.data[0]}')
@@ -142,6 +147,12 @@ class HazardPublisher(Node):
             self.get_object_position(msg.data, time)
             self.hazards.append(msg.data[0])
             self.get_logger().info(f"Hazards: {self.hazards}")
+            
+            if len(self.hazards) == 5:
+                self.get_logger().info(f"Go to goal pose")   
+                #publish(/go_home)
+                pass
+
     
     # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
     def get_object_position(self, data, time):

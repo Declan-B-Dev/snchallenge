@@ -25,7 +25,8 @@ setup(
         'console_scripts': [
             f"best_effort_repeater = {package_name}.best_effort_repeater:main",
             f"publish_hazard = {package_name}.publish_hazard:main",
-            f"publish_navpath = {package_name}.publish_navpath:main"
+            f"publish_navpath = {package_name}.publish_navpath:main",
+            f"waypoint = {package_name}.waypoint:main",
         ],
     },
 )
