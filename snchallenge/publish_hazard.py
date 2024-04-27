@@ -15,6 +15,7 @@ import tf2_geometry_msgs
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 
+import time
 
 from collections import OrderedDict
 
@@ -42,6 +43,8 @@ class HazardPublisher(Node):
         self.pub = self.create_publisher(Marker, '/hazards', 10)
         
         self.start_pub = self.create_publisher(Bool, '/start', 10)
+
+        self.hazards_found = self.create_publisher(Bool, '/go_home', 10)
 
         # Subscriber for /Objects
         self.sub_be = self.create_subscription(
@@ -77,7 +80,7 @@ class HazardPublisher(Node):
         self.scan_dict[keyTime] = msg.ranges
         #self.get_logger().info(f"Laser time: {timeStamp}")
         
-        self.get_logger().info(f"Key time: {keyTime}")
+        #self.get_logger().info(f"Key time: {keyTime}")
         
 
         if len(self.scan_dict) > 30:
@@ -125,22 +128,22 @@ class HazardPublisher(Node):
             
             # Infinite lifetime
             marker_msg.lifetime.sec = 0
-
-            # Publish
-            self.pub.publish(marker_msg)
+                 
+            self.get_logger().info(f"HAZARD PUBLISHED")
+            self.pub.publish(marker_msg) 
+                        
             
             # self.get_logger().info('Visualization marker published.')
 
     def object_listener(self, msg):
 
-        if msg.data and msg.data[0] and not self.started == 13:
+        if msg.data and msg.data[0] == 13 and (not self.started):
             start_msg = Bool()
             start_msg.data = True
             self.start_pub.publish(start_msg)
             self.get_logger().info(f'Sent start msg')
             self.started = True
-
-        elif msg.data and msg.data[0] not in self.hazards:
+        elif msg.data and (msg.data[0] not in self.hazards) and msg.data[0] != 13:
             #self.get_logger().info(f'Object Data: {msg.data[0]}')
             time = self.get_clock().now() # CONSTRUCT time = rclpy.time.Time()
             
@@ -148,11 +151,17 @@ class HazardPublisher(Node):
             self.hazards.append(msg.data[0])
             self.get_logger().info(f"Hazards: {self.hazards}")
             
-            if len(self.hazards) == 5:
+            if len(self.hazards) >= 5:
                 self.get_logger().info(f"Go to goal pose")   
-                #publish(/go_home)
-                pass
+                
+                start_msg = Bool()
+                start_msg.data = False
+                self.start_pub.publish(start_msg)
+                end_msg = Bool()
+                end_msg.data = True
+                self.hazards_found.publish(end_msg)
 
+                
     
     # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
     def get_object_position(self, data, time):
@@ -188,7 +197,7 @@ class HazardPublisher(Node):
         if(laser > 359):
             laser = laser - 360
 
-        depth = min(self.get_depth(time, laser), 1.5) 
+        depth = min(self.get_depth(time, laser), 3) 
 
         xValue = depth - abs(factor/640)
         yValue = depth*(factor/640)

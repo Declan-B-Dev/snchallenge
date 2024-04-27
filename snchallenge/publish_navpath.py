@@ -88,7 +88,7 @@ class NavigationPath(Node):
             #self.get_logger().info(f"Transform: {transform.transform}")
 
             poseT = self.tf_buffer.transform(pose, dest)
-            self.get_logger().info(f" - transformed is {poseT.pose}")
+            #self.get_logger().info(f" - transformed is {poseT.pose}")
 
             self.path_msg.poses.append(poseT)
 

@@ -2,7 +2,7 @@
 
 ## This example is based on TheConstruct Nav2 Tutorial
 
-from waypoint_interfaces.action import NavigateToPose
+from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
 
 import rclpy
@@ -30,10 +30,11 @@ class NavToPoseActionClient(Node):
                     )
 
     def goal_listener(self, data):
-        self.get_logger().info(f"Start goal")
+        self.get_logger().info(f"Receive msg")
 
         if data:
             self.get_logger().info(f"Start goal")
+            self.send_goal()
 
     def send_goal(self):
         self.get_logger().info('Sending Goal')
