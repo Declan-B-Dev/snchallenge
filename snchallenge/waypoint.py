@@ -18,7 +18,6 @@ class NavToPoseActionClient(Node):
                          allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
-        # self._action_client = ActionClient(self, NavigateToPose, 'NavigateToPose')
         self._action_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
         self.get_logger().info('Starting')
         
@@ -30,8 +29,6 @@ class NavToPoseActionClient(Node):
                     )
 
     def goal_listener(self, data):
-        self.get_logger().info(f"Receive msg")
-
         if data:
             self.get_logger().info(f"Start goal")
             self.send_goal()
@@ -88,8 +85,6 @@ def main(args=None):
     rclpy.init(args=args)
 
     action_client = NavToPoseActionClient()
-
-    #action_client.send_goal()
 
     rclpy.spin(action_client)
 

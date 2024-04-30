@@ -11,15 +11,11 @@ from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
-import tf2_geometry_msgs
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 
-import time
-
 from collections import OrderedDict
 
-import math
 import numpy as np
 import cv2 as cv
 import tf2_ros
@@ -39,14 +35,14 @@ class HazardPublisher(Node):
         # Look-up parameters values
         self.frequency = self.get_parameter('frequency').value
         
-        # Publisher
-        self.pub = self.create_publisher(Marker, '/hazards', 10)
+        # Publishers
+        self.hazard_pub = self.create_publisher(Marker, '/hazards', 10)
         
         self.start_pub = self.create_publisher(Bool, '/start', 10)
 
         self.hazards_found = self.create_publisher(Bool, '/go_home', 10)
 
-        # Subscriber for /Objects
+        # The /objects topic reports the id and position of an object relative to the camera image
         self.sub_be = self.create_subscription(
                             Float32MultiArray,
                             '/objects',
@@ -54,7 +50,7 @@ class HazardPublisher(Node):
                             10
                     )
 
-        # Subscriber for /Objects
+        # The /scan topic gives us LIDAR measurements
         self.sub_be = self.create_subscription(
                             LaserScan,
                             '/scan',
@@ -62,6 +58,7 @@ class HazardPublisher(Node):
                             QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
                     )
         
+        # Ordered dictionary allows us to access the earliest and latest items in dict
         self.scan_dict = OrderedDict()
 
         self.hazards = []
@@ -73,24 +70,20 @@ class HazardPublisher(Node):
         self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self)
 
     def scan_listener(self, msg):
+        DICT_LIMIT = 30
         timeStamp = msg.header.stamp
+        
+        # Round to single decimal place for uniformity
         keyTime = round(timeStamp.sec + timeStamp.nanosec/1000000000, 1) # convert nano to seconds, 
-        # publisher already rounds to single decimal place here we explicitely enforce it
-
+        
         self.scan_dict[keyTime] = msg.ranges
-        #self.get_logger().info(f"Laser time: {timeStamp}")
-        
-        #self.get_logger().info(f"Key time: {keyTime}")
-        
-
-        if len(self.scan_dict) > 30:
-            item = self.scan_dict.popitem(last=False) # pop oldest entry
-            #self.get_logger().info(f"Range: {self.scan_dict[keyTime][0]}")
+    
+        # pop oldest entry if dict gets too large
+        if len(self.scan_dict) > DICT_LIMIT:
+            item = self.scan_dict.popitem(last=False) 
 
     def publish_hazard(self, details):
-        # Current time 
         time = self.get_clock().now()
-        #self.get_logger().info(str(time))
         
         # Create the marker
         marker_msg = Marker()
@@ -102,17 +95,17 @@ class HazardPublisher(Node):
         # Marker ID
         marker_msg.id = int(details[0])
 
-        #todo CAMERA HEIGHT
+        src = 'camera_color_frame'
+        dest = 'map'
 
-        poseT = self.transform([details[1], details[2], 0.0], 'camera_color_frame', 'map')
+        poseT = self.transform([details[1], details[2], 0.0], src, dest)
         
         if(poseT):
-            #self.get_logger().info(f"PoseT: {poseT.pose}")
-            
             marker_msg.pose.position.x = poseT.pose.position.x
             marker_msg.pose.position.y = poseT.pose.position.y
             marker_msg.pose.position.z = poseT.pose.position.z
 
+            # Equivalent to 0,0,0 (roll, pitch, yaw)
             marker_msg.pose.orientation.x = 1.0
             marker_msg.pose.orientation.y = 0.0
             marker_msg.pose.orientation.z = 0.0
@@ -129,127 +122,109 @@ class HazardPublisher(Node):
             # Infinite lifetime
             marker_msg.lifetime.sec = 0
                  
-            self.get_logger().info(f"HAZARD PUBLISHED")
-            self.pub.publish(marker_msg) 
-                        
-            
-            # self.get_logger().info('Visualization marker published.')
+            self.hazard_pub.publish(marker_msg) 
 
     def object_listener(self, msg):
+        
+        START_ID = 13
+        GOAL = 5
 
-        if msg.data and msg.data[0] == 13 and (not self.started):
+        if msg.data and msg.data[0] == START_ID and (not self.started):
             start_msg = Bool()
             start_msg.data = True
             self.start_pub.publish(start_msg)
             self.get_logger().info(f'Sent start msg')
             self.started = True
-        elif msg.data and (msg.data[0] not in self.hazards) and msg.data[0] != 13:
-            #self.get_logger().info(f'Object Data: {msg.data[0]}')
-            time = self.get_clock().now() # CONSTRUCT time = rclpy.time.Time()
-            
+
+        elif msg.data and (msg.data[0] not in self.hazards) and msg.data[0] != START_ID:
+            time = self.get_clock().now()
             self.get_object_position(msg.data, time)
+
+            # Keep track of which hazards have been published
             self.hazards.append(msg.data[0])
             self.get_logger().info(f"Hazards: {self.hazards}")
             
-            if len(self.hazards) >= 5:
-                self.get_logger().info(f"Go to goal pose")   
-                
+            if len(self.hazards) >= GOAL:
+                # Stop navigation
                 start_msg = Bool()
                 start_msg.data = False
                 self.start_pub.publish(start_msg)
+
+                self.get_logger().info(f"Go to goal pose")
+                # Initial waypoint navigation/return to start
                 end_msg = Bool()
                 end_msg.data = True
                 self.hazards_found.publish(end_msg)
 
-                
-    
     # Code based on https://husarion.com/tutorials/ros-tutorials/5-visual-object-recognition/#recognizing-objects
     def get_object_position(self, data, time):
         
+        IMAGE_WIDTH = 640
+        MAX_MEASUREMENT = 3
+        MIN_RANGE = 315
+        MAX_VARIATION = 90
+
         id = data[0]
         object_width = data[1]
         object_height = data[2]
 
-        cv_homography = np.zeros((3, 3), dtype=np.float32)
+        cv_homography = np.zeros(shape=(3, 3), dtype=np.float32)
 
         for i in range(9):
             cv_homography[i % 3, i // 3] = data[i + 3]
 
-        in_pts = np.array([[0, 0], [object_width, 0], [0, object_height], [object_width, object_height]], dtype=np.float32)
-        in_pts = np.expand_dims(in_pts, axis=1)
+        in_pts = np.array([[[0, 0], [object_width, 0], [0, object_height], [object_width, object_height]]], dtype=np.float32)
         
         out_pts = cv.perspectiveTransform(in_pts, cv_homography)
 
-        obj_x_pos = np.mean(out_pts[:, :, 0])
+        obj_x_pos = (out_pts[0][0][0] + out_pts[0][1][0] + out_pts[0][2][0] + out_pts[0][3][0])/4
         
-        self.get_logger().info(f"X Pos: {obj_x_pos}")
+        factor = IMAGE_WIDTH/2 - obj_x_pos
 
-        #minX = 0
-        #maxX = 640
-
-        factor = 320 - obj_x_pos
-
-        #minAng = 315
-        #maxAng = 45
-
-        laser = 315 + round(obj_x_pos/640*90)
-
-        if(laser > 359):
-            laser = laser - 360
-
-        depth = min(self.get_depth(time, laser), 3) 
-
-        xValue = depth - abs(factor/640)
-        yValue = depth*(factor/640)
-
-        self.get_logger().info(f"laser: {laser}")
-        self.get_logger().info(f"xValue: {xValue}")
-        self.get_logger().info(f"yValue: {yValue}")
+        # Robot can only see as far as -45 degrees which is equivalent to 315 degrees
+        # Positive bound is +45 degress which gives us a variation of 90
+        laser = MIN_RANGE + round(obj_x_pos/IMAGE_WIDTH*MAX_VARIATION)
         
+        # LIDAR range values are from 0 - 359
+        laser = laser%360
+        # In construct robot gives 360 measurements where as rosbot gives 720
+        laser = laser*2
+        
+        depth = min(self.get_depth(time, laser), MAX_MEASUREMENT) 
+
+        # At either extreme of +-45degrees x == y
+        # Where an object is straight ahead x == depth, y = 0
+        xValue = depth - abs(factor/IMAGE_WIDTH)
+        yValue = depth*(factor/IMAGE_WIDTH)
+
         details = [id, xValue, yValue]
         
         self.publish_hazard(details)
 
     def get_depth(self, timestamp, range):
       
-        #1714130290.672538618
-
         timestamp = round(timestamp.nanoseconds/1000000000,1)
-        self.get_logger().info(f"Time2: {timestamp}")
-    
-
         depth = 0.5
-        range = range*2 # rosbots have 720 readings not 360
 
         if timestamp in self.scan_dict:
             depth = self.scan_dict[timestamp][range]
-            self.get_logger().info(f"Using deange1: {len(self.scan_dict[timestamp])}")
-            self.get_logger().info(f"Found depth: {depth}")
 
         elif timestamp - 0.1 in self.scan_dict:
             depth = self.scan_dict[timestamp - 0.1][range]
-            self.get_logger().info(f"Using deange2: {len(self.scan_dict[timestamp - 0.1])}")
-            self.get_logger().info(f"Found depth2: {depth}")
 
         elif self.scan_dict:
-            depth = self.scan_dict.popitem()[1] # most recent entry
-            self.get_logger().info(f"Using deange3: {len(depth)}")
+            # Access most recent entry
+            depth = self.scan_dict.popitem()[1] 
             depth = depth[range]
-            self.get_logger().info(f"Using depth3: {depth}")
 
         return depth
         
-
     def transform(self, srcPose, src, dest):
         
         poseT = None
         
         try:
-            # Current time CONFIGURABLE 
-            #time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.4)
             time = rclpy.time.Time()
-            #self.get_logger().info(str(time))
-            self.get_logger().info(f"Transform2") 
 
             pose = PoseStamped()
             pose.header.frame_id = src
@@ -267,26 +242,15 @@ class HazardPublisher(Node):
 
             # Configure frames
             
-            #self.get_logger().info(f"From frame: {src}")
-            #self.get_logger().info(f"To frame: {dest}")
-
             # Timeout for transform data
             timeout = rclpy.duration.Duration(seconds=0.8)
 
-            # Lookup a transform
-            #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
-            #self.get_logger().info(f"Transform: {transform.transform}")
-            self.get_logger().info(f"Tranform3")
-
             poseT = self.tf_buffer.transform(pose, dest)
             
-            self.get_logger().info(f"Transform4")
-
         except tf2_ros.ExtrapolationException as ex:
-            #pass
             self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
+        
         except tf2_ros.TransformException as ex2:
-            #pass
             self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
         
         return poseT

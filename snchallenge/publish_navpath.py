@@ -46,11 +46,8 @@ class NavigationPath(Node):
     def publish_path(self):
 
         try:
-            # Current time CONFIGURABLE 
+            # Delay of 0.4 seconds allows for retrieval of transform  
             time = self.get_clock().now() - rclpy.duration.Duration(seconds=0.4)
-            #time = rclpy.time.Time()
-            #self.get_logger().info(str(time))
-            
             dest = 'map'
             src = 'base_link'
 
@@ -65,42 +62,32 @@ class NavigationPath(Node):
             pose.header.frame_id = src
             pose.header.stamp = time.to_msg()
             
+            # We consider the position of base_link to be center of robot
             pose.pose.position.x = 0.0
             pose.pose.position.y = 0.0
             pose.pose.position.z = 0.0
             
-            # Equivalent to 0,0,0 roll, pitch, yaw
+            # Equivalent to 0,0,0 (roll, pitch, yaw)
             pose.pose.orientation.x = 1.0
             pose.pose.orientation.y = 0.0
             pose.pose.orientation.z = 0.0
             pose.pose.orientation.w = 0.0
 
-            # Configure frames
-            
-            #self.get_logger().info(f"From frame: {src}")
-            #self.get_logger().info(f"To frame: {dest}")
-
             # Timeout for transform data
             timeout = rclpy.duration.Duration(seconds=0.8)
 
-            # Lookup a transform
-            #transform = self.tf_buffer.lookup_transform(dest, src, time, timeout=timeout)
-            #self.get_logger().info(f"Transform: {transform.transform}")
-
             poseT = self.tf_buffer.transform(pose, dest)
-            #self.get_logger().info(f" - transformed is {poseT.pose}")
 
             self.path_msg.poses.append(poseT)
 
             # Publish the path
             self.pub.publish(self.path_msg)
-            #self.get_logger().info('Navigation path published.')
+
         except tf2_ros.ExtrapolationException as ex:
-            pass
-            #self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
+            self.get_logger().info(f'Could not gain current data for {src} to {dest}: {ex}')
+
         except tf2_ros.TransformException as ex2:
-            pass
-            #self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
+            self.get_logger().info(f'Could not transform {src} to {dest}: {ex2}')
 
 def main():
     rclpy.init()
